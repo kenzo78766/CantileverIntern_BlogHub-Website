@@ -173,12 +173,12 @@ router.put('/profile', authenticateToken, [
   body('firstName')
     .optional()
     .isLength({ min: 1, max: 50 })
-    .withMessage('First name must be between 1 and 50 characters')
+    .withMessage('First name cannot exceed 50 characters')
     .trim(),
   body('lastName')
     .optional()
     .isLength({ min: 1, max: 50 })
-    .withMessage('Last name must be between 1 and 50 characters')
+    .withMessage('Last name cannot exceed 50 characters')
     .trim(),
   body('bio')
     .optional()
@@ -187,15 +187,8 @@ router.put('/profile', authenticateToken, [
     .trim(),
   body('avatar')
     .optional()
-    .custom((value) => {
-      if (value && value.trim() !== '') {
-        const urlPattern = /^https?:\/\/.+/;
-        if (!urlPattern.test(value)) {
-          throw new Error('Avatar must be a valid URL');
-        }
-      }
-      return true;
-    })
+    .isURL()
+    .withMessage('Avatar must be a valid URL')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -209,28 +202,16 @@ router.put('/profile', authenticateToken, [
     const { firstName, lastName, bio, avatar } = req.body;
     const updateData = {};
 
-    // Only update fields that are provided and not empty
-    if (firstName !== undefined && firstName.trim() !== '') updateData.firstName = firstName.trim();
-    if (lastName !== undefined && lastName.trim() !== '') updateData.lastName = lastName.trim();
-    if (bio !== undefined) updateData.bio = bio.trim();
-    if (avatar !== undefined) updateData.avatar = avatar.trim();
-
-    // Ensure at least one field is being updated
-    if (Object.keys(updateData).length === 0) {
-      return res.status(400).json({
-        message: 'No valid fields provided for update'
-      });
-    }
+    if (firstName !== undefined) updateData.firstName = firstName;
+    if (lastName !== undefined) updateData.lastName = lastName;
+    if (bio !== undefined) updateData.bio = bio;
+    if (avatar !== undefined) updateData.avatar = avatar;
 
     const user = await User.findByIdAndUpdate(
       req.user._id,
       updateData,
       { new: true, runValidators: true }
     ).select('-password');
-
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
 
     res.json({
       message: 'Profile updated successfully',
@@ -247,10 +228,6 @@ router.put('/profile', authenticateToken, [
     });
   } catch (error) {
     console.error('Profile update error:', error);
-    if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map(err => ({ msg: err.message }));
-      return res.status(400).json({ message: 'Validation failed', errors });
-    }
     res.status(500).json({ message: 'Server error updating profile' });
   }
 });
