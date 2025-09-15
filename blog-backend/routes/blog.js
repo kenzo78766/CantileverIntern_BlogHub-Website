@@ -110,21 +110,6 @@ router.get('/:slug', optionalAuth, async (req, res) => {
   }
 });
 
-// Get single blog by ID for editing
-router.get('/edit/:id', authenticateToken, async (req, res) => {
-  try {
-    const blog = await Blog.findOne({ _id: req.params.id, author: req.user._id })
-      .populate('author', 'username firstName lastName fullName avatar');
-
-    if (!blog) return res.status(404).json({ message: 'Blog not found or unauthorized' });
-
-    res.json({ blog });
-  } catch (error) {
-    console.error('Get blog for edit error:', error);
-    res.status(500).json({ message: 'Server error fetching blog' });
-  }
-});
-
 // Create new blog
 router.post('/', authenticateToken, validateBlog, async (req, res) => {
   try {
