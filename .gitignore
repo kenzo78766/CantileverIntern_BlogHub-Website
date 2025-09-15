@@ -1,0 +1,15 @@
+# Node modules
+node_modules
+blog-frontend/node_modules
+blog-backend/node_modules
+
+# Build outputs
+dist
+build
+
+# Environment files
+blog-frontend/.env
+blog-backend/.env
+
+# Logs
+*.log
