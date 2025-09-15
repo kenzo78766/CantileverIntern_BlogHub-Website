@@ -102,12 +102,17 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('user', JSON.stringify(updatedUser));
       setUser(updatedUser);
 
-      toast.success('Profile updated successfully!');
       return { success: true };
     } catch (error) {
+      console.error('Profile update error:', error);
       const message = error.response?.data?.message || 'Profile update failed';
-      toast.error(message);
-      return { success: false, error: message };
+      
+      // Don't show toast here, let the component handle it
+      return { 
+        success: false, 
+        error: message,
+        errors: error.response?.data?.errors 
+      };
     }
   };
 
