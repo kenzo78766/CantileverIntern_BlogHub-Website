@@ -192,23 +192,8 @@ const CreateBlog = () => {
       }
     } catch (error) {
       console.error('Error saving blog:', error);
-      
-      // Handle validation errors from backend
-      if (error.response?.data?.errors) {
-        const backendErrors = {};
-        error.response.data.errors.forEach(err => {
-          if (err.path) {
-            backendErrors[err.path] = err.msg;
-          } else if (err.param) {
-            backendErrors[err.param] = err.msg;
-          }
-        });
-        setErrors(backendErrors);
-        toast.error('Please fix the validation errors');
-      } else {
-        const message = error.response?.data?.message || 'Failed to save article';
-        toast.error(message);
-      }
+      const message = error.response?.data?.message || 'Failed to save article';
+      toast.error(message);
     } finally {
       setLoading(false);
     }

@@ -47,20 +47,9 @@ const Profile = () => {
       if (result.success) {
         setIsEditing(false);
         toast.success('Profile updated successfully!');
-      } else {
-        toast.error(result.message || 'Failed to update profile');
       }
     } catch (error) {
-      console.error('Profile update error:', error);
-      
-      // Handle validation errors from backend
-      if (error.response?.data?.errors) {
-        const errorMessages = error.response.data.errors.map(err => err.msg).join(', ');
-        toast.error(`Validation failed: ${errorMessages}`);
-      } else {
-        const message = error.response?.data?.message || 'Failed to update profile';
-        toast.error(message);
-      }
+      toast.error('Failed to update profile');
     } finally {
       setLoading(false);
     }
