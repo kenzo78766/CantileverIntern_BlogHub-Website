@@ -16,7 +16,7 @@ const validateBlog = [
     .isLength({ min: 50 })
     .withMessage('Content must be at least 50 characters long'),
   body('category')
-    .isIn(['Technology', 'Lifestyle', 'Travel', 'Food', 'Health', 'Business', 'Education', 'Entertainment', 'Sports', 'Other'])
+    .isIn(['Technology','Lifestyle','Travel','Food','Health','Business','Education','Entertainment','Sports','Other'])
     .withMessage('Invalid category'),
   body('tags')
     .optional()
@@ -29,18 +29,19 @@ const validateBlog = [
   body('featuredImage')
     .optional()
     .custom((value) => {
-      if (value && !/^https?:\/\//.test(value)) {
-        throw new Error('Featured image must be a valid URL');
-      }
+      if (value && !/^https?:\/\//.test(value)) throw new Error('Featured image must be a valid URL');
       return true;
     }),
   body('status')
     .optional()
-    .isIn(['draft', 'published', 'archived'])
+    .isIn(['draft','published','archived'])
     .withMessage('Invalid status')
 ];
 
-// Get all published blogs with pagination and filtering
+// Helper to format validation errors
+const formatErrors = (errors) => errors.array().map(err => ({ field: err.param, message: err.msg }));
+
+// Get all published blogs
 router.get('/', [
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('Limit must be between 1 and 50'),
@@ -51,29 +52,21 @@ router.get('/', [
 ], optionalAuth, async (req, res) => {
   try {
     const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        message: 'Validation failed',
-        errors: errors.array()
-      });
-    }
+    if (!errors.isEmpty()) return res.status(400).json({ message: 'Validation failed', errors: formatErrors(errors) });
 
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
     const filter = { status: 'published', isActive: true };
-    
     if (req.query.category) filter.category = req.query.category;
     if (req.query.tag) filter.tags = { $in: [req.query.tag] };
     if (req.query.author) filter.author = req.query.author;
-    if (req.query.search) {
-      filter.$or = [
-        { title: { $regex: req.query.search, $options: 'i' } },
-        { content: { $regex: req.query.search, $options: 'i' } },
-        { tags: { $in: [new RegExp(req.query.search, 'i')] } }
-      ];
-    }
+    if (req.query.search) filter.$or = [
+      { title: { $regex: req.query.search, $options: 'i' } },
+      { content: { $regex: req.query.search, $options: 'i' } },
+      { tags: { $in: [new RegExp(req.query.search, 'i')] } }
+    ];
 
     const blogs = await Blog.find(filter)
       .populate('author', 'username firstName lastName fullName avatar')
@@ -133,24 +126,16 @@ router.get('/edit/:id', authenticateToken, async (req, res) => {
 router.post('/', authenticateToken, validateBlog, async (req, res) => {
   try {
     const errors = validationResult(req);
-    if (!errors.isEmpty())
-      return res.status(400).json({ message: 'Validation failed', errors: errors.array() });
+    if (!errors.isEmpty()) return res.status(400).json({ message: 'Validation failed', errors: formatErrors(errors) });
 
     const { title, content, category, tags, excerpt, featuredImage, status } = req.body;
 
-    // Validate required fields for publishing
-    if (status === 'published') {
-      if (!title || !content || !category) {
-        return res.status(400).json({ 
-          message: 'Validation failed', 
-          errors: [{ msg: 'Title, content, and category are required for publishing' }] 
-        });
-      }
-    }
+    if (status === 'published' && (!title || !content || !category))
+      return res.status(400).json({ message: 'Validation failed', errors: [{ field: 'general', message: 'Title, content, and category are required for publishing' }] });
 
     const blog = new Blog({
       title,
-      slug: slugify(title, { lower: true, strict: true }) + '-' + Date.now(), // auto-generate unique slug
+      slug: slugify(title, { lower: true, strict: true }) + '-' + Date.now(),
       content,
       category,
       tags: tags || [],
@@ -168,7 +153,7 @@ router.post('/', authenticateToken, validateBlog, async (req, res) => {
   } catch (error) {
     console.error('Create blog error:', error);
     if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map(err => ({ msg: err.message }));
+      const errors = Object.values(error.errors).map(err => ({ field: err.path, message: err.message }));
       return res.status(400).json({ message: 'Validation failed', errors });
     }
     res.status(500).json({ message: 'Server error creating blog' });
@@ -179,23 +164,15 @@ router.post('/', authenticateToken, validateBlog, async (req, res) => {
 router.put('/:id', authenticateToken, validateBlog, async (req, res) => {
   try {
     const errors = validationResult(req);
-    if (!errors.isEmpty())
-      return res.status(400).json({ message: 'Validation failed', errors: errors.array() });
+    if (!errors.isEmpty()) return res.status(400).json({ message: 'Validation failed', errors: formatErrors(errors) });
 
     const blog = await Blog.findOne({ _id: req.params.id, author: req.user._id });
     if (!blog) return res.status(404).json({ message: 'Blog not found or unauthorized' });
 
     const { title, content, category, tags, excerpt, featuredImage, status } = req.body;
 
-    // Validate required fields for publishing
-    if (status === 'published') {
-      if (!title || !content || !category) {
-        return res.status(400).json({ 
-          message: 'Validation failed', 
-          errors: [{ msg: 'Title, content, and category are required for publishing' }] 
-        });
-      }
-    }
+    if (status === 'published' && (!title || !content || !category))
+      return res.status(400).json({ message: 'Validation failed', errors: [{ field: 'general', message: 'Title, content, and category are required for publishing' }] });
 
     blog.title = title;
     blog.content = content;
@@ -212,7 +189,7 @@ router.put('/:id', authenticateToken, validateBlog, async (req, res) => {
   } catch (error) {
     console.error('Update blog error:', error);
     if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map(err => ({ msg: err.message }));
+      const errors = Object.values(error.errors).map(err => ({ field: err.path, message: err.message }));
       return res.status(400).json({ message: 'Validation failed', errors });
     }
     res.status(500).json({ message: 'Server error updating blog' });
@@ -233,15 +210,15 @@ router.delete('/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Get user's own blogs
+// User blogs
 router.get('/user/my-blogs', authenticateToken, [
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('Limit must be between 1 and 50'),
-  query('status').optional().isIn(['draft', 'published', 'archived']).withMessage('Invalid status')
+  query('status').optional().isIn(['draft','published','archived']).withMessage('Invalid status')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ message: 'Validation failed', errors: errors.array() });
+    if (!errors.isEmpty()) return res.status(400).json({ message: 'Validation failed', errors: formatErrors(errors) });
 
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -280,7 +257,6 @@ router.post('/:id/like', authenticateToken, async (req, res) => {
     else blog.likes.push(req.user._id);
 
     await blog.save();
-
     res.json({ message: userLikeIndex > -1 ? 'Blog unliked' : 'Blog liked', likeCount: blog.likes.length, isLiked: userLikeIndex === -1 });
   } catch (error) {
     console.error('Like blog error:', error);
@@ -288,13 +264,13 @@ router.post('/:id/like', authenticateToken, async (req, res) => {
   }
 });
 
-// Add comment to blog
+// Add comment
 router.post('/:id/comments', authenticateToken, [
   body('content').isLength({ min: 1, max: 1000 }).withMessage('Comment content is required and cannot exceed 1000 characters').trim()
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ message: 'Validation failed', errors: errors.array() });
+    if (!errors.isEmpty()) return res.status(400).json({ message: 'Validation failed', errors: formatErrors(errors) });
 
     const blog = await Blog.findById(req.params.id);
     if (!blog) return res.status(404).json({ message: 'Blog not found' });
@@ -302,7 +278,6 @@ router.post('/:id/comments', authenticateToken, [
     const comment = { author: req.user._id, content: req.body.content, createdAt: new Date() };
     blog.comments.push(comment);
     await blog.save();
-
     await blog.populate('comments.author', 'username firstName lastName fullName avatar');
     const newComment = blog.comments[blog.comments.length - 1];
 
@@ -313,10 +288,10 @@ router.post('/:id/comments', authenticateToken, [
   }
 });
 
-// Get blog categories
+// Categories
 router.get('/meta/categories', async (req, res) => {
   try {
-    const categories = ['Technology', 'Lifestyle', 'Travel', 'Food', 'Health', 'Business', 'Education', 'Entertainment', 'Sports', 'Other'];
+    const categories = ['Technology','Lifestyle','Travel','Food','Health','Business','Education','Entertainment','Sports','Other'];
     res.json({ categories });
   } catch (error) {
     console.error('Get categories error:', error);
@@ -324,7 +299,7 @@ router.get('/meta/categories', async (req, res) => {
   }
 });
 
-// Get popular tags
+// Tags
 router.get('/meta/tags', async (req, res) => {
   try {
     const tags = await Blog.aggregate([
@@ -334,7 +309,6 @@ router.get('/meta/tags', async (req, res) => {
       { $sort: { count: -1 } },
       { $limit: 20 }
     ]);
-
     res.json({ tags: tags.map(tag => ({ name: tag._id, count: tag.count })) });
   } catch (error) {
     console.error('Get tags error:', error);
