@@ -187,8 +187,12 @@ router.put('/profile', authenticateToken, [
     .trim(),
   body('avatar')
     .optional()
-    .isURL()
-    .withMessage('Avatar must be a valid URL')
+    .custom((value) => {
+      if (value && !/^https?:\/\//.test(value)) {
+        throw new Error('Avatar must be a valid URL');
+      }
+      return true;
+    })
 ], async (req, res) => {
   try {
     const errors = validationResult(req);

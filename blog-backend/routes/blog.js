@@ -28,8 +28,12 @@ const validateBlog = [
     .withMessage('Excerpt cannot exceed 300 characters'),
   body('featuredImage')
     .optional()
-    .isURL()
-    .withMessage('Featured image must be a valid URL'),
+    .custom((value) => {
+      if (value && !/^https?:\/\//.test(value)) {
+        throw new Error('Featured image must be a valid URL');
+      }
+      return true;
+    }),
   body('status')
     .optional()
     .isIn(['draft', 'published', 'archived'])
