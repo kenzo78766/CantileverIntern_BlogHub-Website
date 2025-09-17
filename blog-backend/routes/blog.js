@@ -107,7 +107,7 @@ router.get('/:slug', optionalAuth, async (req, res) => {
   }
 });
 
-// Get single blog by ID for editing
+// Get single blog by ID for editing (FIXED)
 router.get('/edit/:id', authenticateToken, async (req, res) => {
   try {
     const blog = await Blog.findOne({ _id: req.params.id, author: req.user._id })
@@ -118,6 +118,9 @@ router.get('/edit/:id', authenticateToken, async (req, res) => {
     res.json({ blog });
   } catch (error) {
     console.error('Get blog for edit error:', error);
+    if (error.kind === 'ObjectId') {
+      return res.status(400).json({ message: 'Invalid blog ID' });
+    }
     res.status(500).json({ message: 'Server error fetching blog' });
   }
 });
