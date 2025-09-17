@@ -28,7 +28,7 @@ const blogSchema = new mongoose.Schema({
   },
   slug: {
     type: String,
-    unique: true,
+    unique: true,   // keep only this (unique + required)
     required: true
   },
   content: {
@@ -48,7 +48,18 @@ const blogSchema = new mongoose.Schema({
   category: {
     type: String,
     required: true,
-    enum: ['Technology', 'Lifestyle', 'Travel', 'Food', 'Health', 'Business', 'Education', 'Entertainment', 'Sports', 'Other']
+    enum: [
+      'Technology',
+      'Lifestyle',
+      'Travel',
+      'Food',
+      'Health',
+      'Business',
+      'Education',
+      'Entertainment',
+      'Sports',
+      'Other'
+    ]
   },
   tags: [{
     type: String,
@@ -91,17 +102,17 @@ const blogSchema = new mongoose.Schema({
 });
 
 // Virtual for like count
-blogSchema.virtual('likeCount').get(function() {
+blogSchema.virtual('likeCount').get(function () {
   return this.likes.length;
 });
 
 // Virtual for comment count
-blogSchema.virtual('commentCount').get(function() {
+blogSchema.virtual('commentCount').get(function () {
   return this.comments.length;
 });
 
-// Generate slug before saving
-blogSchema.pre('save', function(next) {
+// Generate slug + reading time + published date before saving
+blogSchema.pre('save', function (next) {
   if (this.isModified('title')) {
     this.slug = slugify(this.title, {
       lower: true,
@@ -109,51 +120,47 @@ blogSchema.pre('save', function(next) {
       remove: /[*+~.()'"!:@]/g
     });
   }
-  
-  // Calculate reading time (average 200 words per minute)
+
   if (this.isModified('content')) {
     const wordCount = this.content.split(/\s+/).length;
     this.readingTime = Math.ceil(wordCount / 200);
   }
-  
-  // Set published date when status changes to published
+
   if (this.isModified('status') && this.status === 'published' && !this.publishedAt) {
     this.publishedAt = new Date();
   }
-  
+
   next();
 });
 
-// Ensure unique slug
-blogSchema.pre('save', async function(next) {
+// Ensure unique slug (append -1, -2 if duplicate found)
+blogSchema.pre('save', async function (next) {
   if (!this.isModified('title')) return next();
-  
+
   let baseSlug = this.slug;
   let counter = 1;
-  
+
   while (true) {
     const existingBlog = await this.constructor.findOne({
       slug: this.slug,
       _id: { $ne: this._id }
     });
-    
+
     if (!existingBlog) break;
-    
+
     this.slug = `${baseSlug}-${counter}`;
     counter++;
   }
-  
+
   next();
 });
 
-// Index for better query performance
+// Indexes for queries (EXCEPT slug duplicate index)
 blogSchema.index({ status: 1, publishedAt: -1 });
 blogSchema.index({ author: 1, status: 1 });
 blogSchema.index({ category: 1, status: 1 });
 blogSchema.index({ tags: 1, status: 1 });
-blogSchema.index({ slug: 1 });
 
 const Blog = mongoose.model('Blog', blogSchema);
 
 export default Blog;
-
