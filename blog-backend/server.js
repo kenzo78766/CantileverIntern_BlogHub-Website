@@ -13,9 +13,21 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Allowed Frontend URLs
+const allowedOrigins = [
+  "https://cantileverintern-bloghub-frontend.onrender.com", // your frontend on Render
+  "http://localhost:5173" // for local development
+];
+
 // Middleware
 app.use(cors({
-  origin: '*', // Allow all origins for development
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("CORS not allowed for this origin: " + origin));
+    }
+  },
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -33,7 +45,7 @@ app.get('/api/health', (req, res) => {
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ message: 'Something went wrong!' });
+  res.status(500).json({ message: err.message || 'Something went wrong!' });
 });
 
 // 404 handler
@@ -56,11 +68,10 @@ const connectDB = async () => {
 // Start server
 const startServer = async () => {
   await connectDB();
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on port ${PORT}`);
+  app.listen(PORT, () => {
+    console.log(`✅ Server running on port ${PORT}`);
     console.log(`Health check: http://localhost:${PORT}/api/health`);
   });
 };
 
 startServer();
-
